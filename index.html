@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Toko Online Saya</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: Arial, sans-serif;
+      background: #f5f6fa;
+      color: #222;
+    }
+    header {
+      background: #176b4d;
+      color: white;
+      padding: 24px 16px;
+      text-align: center;
+    }
+    header h1 { margin: 0 0 8px; }
+    main { max-width: 1000px; margin: auto; padding: 16px; }
+    h2 { margin-top: 24px; }
+    #produk {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 14px;
+    }
+    .kartu {
+      background: white;
+      padding: 14px;
+      border-radius: 12px;
+      box-shadow: 0 2px 8px #00000010;
+    }
+    .kartu img {
+      width: 100%;
+      height: 130px;
+      object-fit: cover;
+      border-radius: 8px;
+      background: #eee;
+    }
+    .harga { color: #176b4d; font-weight: bold; }
+    button {
+      background: #176b4d;
+      color: white;
+      border: 0;
+      padding: 10px 14px;
+      border-radius: 7px;
+      cursor: pointer;
+    }
+    button:disabled { background: #aaa; }
+    input, textarea {
+      width: 100%;
+      padding: 11px;
+      margin: 6px 0 12px;
+      border: 1px solid #ccc;
+      border-radius: 7px;
+      font: inherit;
+    }
+    .panel {
+      background: white;
+      padding: 16px;
+      border-radius: 12px;
+      margin-top: 18px;
+    }
+    .baris-keranjang {
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      padding: 8px 0;
+      border-bottom: 1px solid #eee;
+    }
+    #pesan { white-space: pre-wrap; }
+    footer { text-align: center; padding: 24px; color: #666; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Toko Online Saya</h1>
+    <p>Pilih produk favoritmu dan pesan dengan mudah</p>
+  </header>
+
+  <main>
+    <h2>Daftar Produk</h2>
+    <p id="status">Sedang memuat produk...</p>
+    <div id="produk"></div>
+
+    <section class="panel">
+      <h2>Keranjang Belanja</h2>
+      <div id="keranjang">Keranjang masih kosong.</div>
+      <h3 id="total">Total: Rp0</h3>
+      <button onclick="kosongkanKeranjang()">Kosongkan Keranjang</button>
+    </section>
+
+    <section class="panel">
+      <h2>Formulir Pemesanan</h2>
+      <form id="formPesanan">
+        <label>Nama pemesan</label>
+        <input id="nama" required>
+
+        <label>Nomor WhatsApp pemesan</label>
+        <input id="whatsapp" type="tel" required>
+
+        <label>Alamat pengiriman</label>
+        <textarea id="alamat" rows="3" required></textarea>
+
+        <button type="submit">Buat Pesanan</button>
+      </form>
+      <p id="pesan"></p>
+    </section>
+  </main>
+
+  <footer>Toko Online Saya</footer>
+
+  <script>
+    // GANTI dengan URL Web App Apps Script kamu yang berakhiran /exec
+    const API_URL = "https://script.google.com/macros/s/AKfycbxwPzM2a6KASnx0M60OEHuQLFPa1rOZN244UIfb-0p4u6Z2_lBAO6O3-bGhvw4yZKoD/exec
+    let produkList = [];
+    let keranjang = [];
+
+    const rupiah = angka => Number(angka || 0).toLocaleString("id-ID", {
+      style: "currency",
+      currency: "IDR",
+      maximumFractionDigits: 0
+    });
+
+    async function muatProduk() {
+      const status = document.getElementById("status");
+      try {
+        if (API_URL.includes("TEMPEL_URL")) {
+          throw new Error("URL Apps Script belum dimasukkan ke kode.");
+        }
+
+        const respons = await fetch(API_URL);
+        if (!respons.ok) throw new Error("Gagal menghubungi server.");
+
+        const hasil = await respons.json();
+        if (hasil.status !== "success") {
+          throw new Error("Data produk tidak berhasil dimuat.");
+        }
+
+        produkList = hasil.data.filter(p => p.nama);
+        tampilkanProduk();
+        status.textContent = produkList.length
+          ? "Pilih produk yang ingin dibeli."
+          : "Belum ada produk di Google Sheets.";
+      } catch (error) {
+        status.textContent = error.message +
+          " Periksa URL Apps Script dan pengaturan akses Web App.";
+      }
+    }
+
+    function tampilkanProduk() {
+      const tempat = document.getElementById("produk");
+      tempat.innerHTML = "";
+
+      produkList.forEach((p, i) => {
+        const kartu = document.createElement("article");
+        kartu.className = "kartu";
+
+        if (p.foto) {
+          const gambar = document.createElement("img");
+          gambar.src = p.foto;
+          gambar.alt = p.nama || "Foto produk";
+          gambar.onerror = () => gambar.remove();
+          kartu.appendChild(gambar);
+        }
+
+        const nama = document.createElement("h3");
+        nama.textContent = p.nama;
+        kartu.appendChild(nama);
+
+        const kategori = document.createElement("p");
+        kategori.textContent = p.kategori || "Produk";
+        kartu.appendChild(kategori);
+
+        const harga = document.createElement("p");
+        harga.className = "harga";
+        harga.textContent = rupiah(p.harga);
+        kartu.appendChild(harga);
+
+        const stok = document.createElement("p");
+        stok.textContent = "Stok: " + (p.stok ?? 0);
+        kartu.appendChild(stok);
+
+        if (p.deskripsi) {
+          const deskripsi = document.createElement("p");
+          deskripsi.textContent = p.deskripsi;
+          kartu.appendChild(deskripsi);
+        }
+
+        const tombol = document.createElement("button");
+        tombol.textContent = Number(p.stok) > 0
+          ? "Tambah ke Keranjang" : "Stok Habis";
+        tombol.disabled = !(Number(p.stok) > 0);
+        tombol.onclick = () => tambahKeranjang(i);
+        kartu.appendChild(tombol);
+
+        tempat.appendChild(kartu);
+      });
+    }
+
+    function tambahKeranjang(index) {
+      const p = produkList[index];
+      const item = keranjang.find(x => x.id === p.id);
+
+      if (item) {
+        if (item.jumlah >= Number(p.stok)) {
+          alert("Jumlah melebihi stok yang tersedia.");
+          return;
+        }
+        item.jumlah++;
+      } else {
+        keranjang.push({
+          id: p.id,
+          nama: p.nama,
+          harga: Number(p.harga),
+          jumlah: 1,
+          stok: Number(p.stok)
+        });
+      }
+      tampilkanKeranjang();
+    }
+
+    function tampilkanKeranjang() {
+      const tempat = document.getElementById("keranjang");
+      tempat.innerHTML = "";
+
+      if (!keranjang.length) {
+        tempat.textContent = "Keranjang masih kosong.";
+      }
+
+      keranjang.forEach((item, i) => {
+        const baris = document.createElement("div");
+        baris.className = "baris-keranjang";
+
+        const info = document.createElement("span");
+        info.textContent = item.nama + " × " + item.jumlah +
+          " — " + rupiah(item.harga * item.jumlah);
+
+        const hapus = document.createElement("button");
+        hapus.textContent = "Hapus";
+        hapus.onclick = () => {
+          keranjang.splice(i, 1);
+          tampilkanKeranjang();
+        };
+
+        baris.append(info, hapus);
+        tempat.appendChild(baris);
+      });
+
+      const jumlah = keranjang.reduce(
+        (sum, item) => sum + item.harga * item.jumlah, 0
+      );
+      document.getElementById("total").textContent =
+        "Total: " + rupiah(jumlah);
+    }
+
+    function kosongkanKeranjang() {
+      keranjang = [];
+      tampilkanKeranjang();
+    }
+
+    document.getElementById("formPesanan").addEventListener(
+      "submit", async function(event) {
+        event.preventDefault();
+
+        if (!keranjang.length) {
+          alert("Tambahkan produk ke keranjang terlebih dahulu.");
+          return;
+        }
+
+        const tombol = this.querySelector('button[type="submit"]');
+        const pesan = document.getElementById("pesan");
+        tombol.disabled = true;
+        pesan.textContent = "Sedang mengirim pesanan...";
+
+        const dataPesanan = {
+          nama: document.getElementById("nama").value.trim(),
+          whatsapp: document.getElementById("whatsapp").value.trim(),
+          alamat: document.getElementById("alamat").value.trim(),
+          items: keranjang.map(item => ({
+            id: item.id,
+            nama: item.nama,
+            harga: item.harga,
+            jumlah: item.jumlah
+          })),
+          total: keranjang.reduce(
+            (sum, item) => sum + item.harga * item.jumlah, 0
+          )
+        };
+
+        try {
+          const respons = await fetch(API_URL, {
+            method: "POST",
+            headers: { "Content-Type": "text/plain;charset=utf-8" },
+            body: JSON.stringify(dataPesanan)
+          });
+
+          const hasil = await respons.json();
+
+          if (hasil.status !== "success") {
+            throw new Error(hasil.message || "Pesanan gagal disimpan.");
+          }
+
+          pesan.textContent = "Pesanan berhasil dikirim!\nNomor invoice: " +
+            hasil.invoice;
+          keranjang = [];
+          tampilkanKeranjang();
+          this.reset();
+        } catch (error) {
+          pesan.textContent =
+            "Belum dapat memastikan pesanan tersimpan. " +
+            "Periksa koneksi dan data pada sheet Pesanan, lalu coba lagi. " +
+            "Detail: " + error.message;
+        } finally {
+          tombol.disabled = false;
+        }
+      }
+    );
+
+    muatProduk();
+  </script>
+</body>
+</html>
